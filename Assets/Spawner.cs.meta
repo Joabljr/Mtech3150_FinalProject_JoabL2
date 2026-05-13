@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: 8acf5c2dd546541898b4e6640d9c1cfc
+MonoImporter:
+  externalObjects: {}
+  serializedVersion: 2
+  defaultReferences:
+  - spawnPointsParent: {fileID: 9006541478186831955, guid: 4033c0163f7c04baca6bc9513eb29b76, type: 3}
+  - cubePrefab: {fileID: 53032188170787579, guid: ad74d1f0a89a24ad4bf0fa0df3f72fec, type: 3}
+  - toughCubePrefab: {fileID: 53032188170787579, guid: e76104538fa8b46ee9e9ac26b899677f, type: 3}
+  executionOrder: 0
+  icon: {instanceID: 0}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
