@@ -1,11 +1,11 @@
 using System.Collections;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 
 public class FloatingEyeEnemy : MonoBehaviour
 {
     [Header("References")]
-    public GameObject player; // ⭐ MUST be the Player GameObject
-    public LineRenderer aimingLine;
+    public Transform player;
     public LineRenderer chargeBeam;
     public LineRenderer laserBeam;
 
@@ -15,108 +15,66 @@ public class FloatingEyeEnemy : MonoBehaviour
     public AudioSource fireSound;
     public CanvasGroup screenFlash;
 
-    [Header("Movement Settings")]
-    public float bobAmount = 0.5f;
-    public float bobSpeed = 2f;
-    public float moveSpeed = 3f;
-
-    [Header("Natural Movement")]
-    public float orbitSpeed = 20f;
-    public float baseOrbitRadius = 12f;
-
-    public float radiusPulseAmount = 1f;
-    public float radiusPulseSpeed = 0.5f;
-
-    public float orbitWobbleAmount = 0.4f;
-    public float orbitWobbleSpeed = 1.2f;
-
-    public float driftAmount = 1.5f;
-    public float driftSpeed = 0.5f;
-
-    public float microDriftAmount = 0.3f;
-    public float microDriftSpeed = 3f;
+    [Header("Spaceship Movement")]
+    public float orbitHeight = 8f;      // stays above player
+    public float orbitRadius = 14f;     // stays away from player
+    public float orbitSpeed = 12f;      // slow spaceship orbit
+    public float bobAmount = 0.4f;
+    public float bobSpeed = 1.5f;
+    public float moveSpeed = 3f;        // FIXED: needed for Lerp
 
     [Header("Laser Settings")]
-    public float lockOnTime = 3f;
-    public float firingTime = 3f;
-    public float cooldownTime = 5f;
+    public float lockOnTime = 3f;       // shrinks over time
+    public float firingTime = 2f;
+    public float cooldownTime = 3f;
     public float laserRange = 100f;
 
-    private Vector3 patrolCenter;
+    public float laserTurnSpeed = 25f;      // turret rotation speed
+    public float turnSpeedIncrease = 2f;    // difficulty ramp
+    public float lockOnDecrease = 0.25f;    // difficulty ramp
+
     private Vector3 frozenTargetPoint;
-
-    private Material eyeMat;
-    private Vector3 originalPos;
-
-    private float chargeBeamStartWidth = 0.05f;
-    private float chargeBeamEndWidth = 0.35f;
-
+    private Vector3 laserDir;
     private float orbitAngle;
-    private float noiseOffsetX;
-    private float noiseOffsetZ;
 
     private enum State { Tracking, Firing, Cooldown }
     private State currentState = State.Tracking;
 
-    // ⭐ Player controller reference for voice lines
-    private FirstPersonController playerController;
-
     private void Start()
     {
-        patrolCenter = transform.position;
-        originalPos = transform.localPosition;
+        // Auto-find player
+        if (player == null)
+        {
+            GameObject p = GameObject.FindGameObjectWithTag("Player");
+            if (p != null) player = p.transform;
+        }
 
-        noiseOffsetX = Random.Range(0f, 999f);
-        noiseOffsetZ = Random.Range(0f, 999f);
-
-        // NON-GLOW LASERS
-        StyleLaser(aimingLine, 0.08f, Color.yellow);
-        StyleLaser(laserBeam, 0.35f, Color.red);
-        StyleLaser(chargeBeam, chargeBeamStartWidth, Color.yellow);
+        // Start laser pointing AWAY from player
+        Vector3 initialDir = (player.position - transform.position).normalized;
+        laserDir = Quaternion.Euler(0, -60f, 0) * initialDir;
 
         chargeBeam.enabled = false;
-
-        eyeMat = GetComponentInChildren<Renderer>().material;
-
-        if (chargeSound != null) chargeSound.loop = true;
-        if (fireSound != null) fireSound.loop = false;
-
-        if (screenFlash != null) screenFlash.alpha = 0;
-
-        // ⭐ Assign player controller correctly
-        if (player != null)
-            playerController = player.GetComponent<FirstPersonController>();
+        laserBeam.enabled = false;
 
         StartCoroutine(StateMachine());
-    }
-
-    private void StyleLaser(LineRenderer lr, float width, Color color)
-    {
-        lr.startWidth = width;
-        lr.endWidth = width;
-
-        lr.material = new Material(Shader.Find("Unlit/Color"));
-        lr.material.color = color;
     }
 
     private IEnumerator StateMachine()
     {
         while (true)
         {
-            yield return currentState switch
+            switch (currentState)
             {
-                State.Tracking => TrackingPhase(),
-                State.Firing => FiringPhase(),
-                State.Cooldown => CooldownPhase(),
-                _ => null
-            };
+                case State.Tracking: yield return TrackingPhase(); break;
+                case State.Firing: yield return FiringPhase(); break;
+                case State.Cooldown: yield return CooldownPhase(); break;
+            }
         }
     }
 
-    // ---------------- TRACKING (CHARGING) ----------------
+    // ---------------- TRACKING ----------------
     private IEnumerator TrackingPhase()
     {
-        aimingLine.enabled = true;
         chargeBeam.enabled = true;
 
         float timer = 0f;
@@ -124,27 +82,28 @@ public class FloatingEyeEnemy : MonoBehaviour
         if (chargeParticles != null) chargeParticles.Play();
         if (chargeSound != null) chargeSound.Play();
 
-        // ⭐ Trigger player voice line + UI warning
-        if (playerController != null)
-        {
-            Debug.Log("Enemy charging → calling ShowChargeWarning()");
-            playerController.ShowChargeWarning();
-        }
-
-        frozenTargetPoint = player.transform.position;
+        // Freeze player position ONCE
+        frozenTargetPoint = player.position;
 
         while (timer < lockOnTime)
         {
-            float t = timer / lockOnTime;
+            // Slowly rotate laser toward frozen point
+            Vector3 targetDir = (frozenTargetPoint - transform.position).normalized;
 
+            Quaternion currentRot = Quaternion.LookRotation(laserDir);
+            Quaternion targetRot = Quaternion.LookRotation(targetDir);
+
+            Quaternion newRot = Quaternion.RotateTowards(
+                currentRot,
+                targetRot,
+                laserTurnSpeed * Time.deltaTime
+            );
+
+            laserDir = newRot * Vector3.forward;
+
+            // Update charge beam
             chargeBeam.SetPosition(0, transform.position);
-            chargeBeam.SetPosition(1, frozenTargetPoint);
-
-            float width = Mathf.Lerp(chargeBeamStartWidth, chargeBeamEndWidth, t);
-            chargeBeam.startWidth = width;
-            chargeBeam.endWidth = width;
-
-            chargeBeam.material.color = Color.Lerp(Color.yellow, Color.red, t);
+            chargeBeam.SetPosition(1, transform.position + laserDir * laserRange);
 
             timer += Time.deltaTime;
             yield return null;
@@ -156,20 +115,12 @@ public class FloatingEyeEnemy : MonoBehaviour
     // ---------------- FIRING ----------------
     private IEnumerator FiringPhase()
     {
-        aimingLine.enabled = false;
         chargeBeam.enabled = false;
         laserBeam.enabled = true;
 
         if (chargeParticles != null) chargeParticles.Stop();
         if (chargeSound != null) chargeSound.Stop();
         if (fireSound != null) fireSound.Play();
-
-        // ⭐ Trigger firing voice line
-        if (playerController != null)
-        {
-            Debug.Log("Enemy firing → calling PlayVoice()");
-            playerController.PlayVoice(playerController.vl_enemyFiring, playerController.freq_enemyFiring);
-        }
 
         if (screenFlash != null)
             StartCoroutine(ScreenFlashEffect());
@@ -178,19 +129,33 @@ public class FloatingEyeEnemy : MonoBehaviour
 
         while (timer < firingTime)
         {
+            // Continue slow rotation toward frozen point
+            Vector3 targetDir = (frozenTargetPoint - transform.position).normalized;
+
+            Quaternion currentRot = Quaternion.LookRotation(laserDir);
+            Quaternion targetRot = Quaternion.LookRotation(targetDir);
+
+            Quaternion newRot = Quaternion.RotateTowards(
+                currentRot,
+                targetRot,
+                laserTurnSpeed * Time.deltaTime
+            );
+
+            laserDir = newRot * Vector3.forward;
+
+            // Update firing beam
             Vector3 origin = transform.position;
-            Vector3 dir = (frozenTargetPoint - origin).normalized;
-
             laserBeam.SetPosition(0, origin);
-            laserBeam.SetPosition(1, origin + dir * laserRange);
+            laserBeam.SetPosition(1, origin + laserDir * laserRange);
 
-            RaycastHit[] hits = Physics.SphereCastAll(origin, 0.5f, dir, laserRange);
-
+            // Damage
+            RaycastHit[] hits = Physics.SphereCastAll(origin, 0.5f, laserDir, laserRange);
             foreach (RaycastHit hit in hits)
             {
-                CubeHealth cube = hit.collider.GetComponent<CubeHealth>();
-                if (cube != null)
-                    cube.TakeHit(1, true);
+                if (hit.collider.CompareTag("Player"))
+                {
+                    SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
+                }
             }
 
             timer += Time.deltaTime;
@@ -198,7 +163,10 @@ public class FloatingEyeEnemy : MonoBehaviour
         }
 
         laserBeam.enabled = false;
-        if (fireSound != null) fireSound.Stop();
+
+        // Difficulty ramp
+        laserTurnSpeed += turnSpeedIncrease;
+        lockOnTime = Mathf.Max(0.75f, lockOnTime - lockOnDecrease);
 
         currentState = State.Cooldown;
     }
@@ -218,49 +186,29 @@ public class FloatingEyeEnemy : MonoBehaviour
     // ---------------- COOLDOWN ----------------
     private IEnumerator CooldownPhase()
     {
-        float timer = 0f;
-
-        while (timer < cooldownTime)
-        {
-            timer += Time.deltaTime;
-            yield return null;
-        }
-
+        yield return new WaitForSeconds(cooldownTime);
         currentState = State.Tracking;
     }
 
-    // ---------------- MOVEMENT ----------------
+    // ---------------- MOVEMENT (SPACESHIP) ----------------
     private void Update()
     {
+        if (player == null) return;
+
+        // Orbit around player at a fixed height
         orbitAngle += orbitSpeed * Time.deltaTime;
         float rad = orbitAngle * Mathf.Deg2Rad;
 
-        float pulsedRadius =
-            baseOrbitRadius +
-            Mathf.Sin(Time.time * radiusPulseSpeed) * radiusPulseAmount;
-
-        Vector3 orbitPos = patrolCenter + new Vector3(
-            Mathf.Cos(rad) * pulsedRadius,
-            0,
-            Mathf.Sin(rad) * pulsedRadius
+        Vector3 orbitPos = player.position + new Vector3(
+            Mathf.Cos(rad) * orbitRadius,
+            orbitHeight,
+            Mathf.Sin(rad) * orbitRadius
         );
 
-        orbitPos.y += Mathf.Sin(Time.time * orbitWobbleSpeed) * orbitWobbleAmount;
+        // Bobbing
+        orbitPos.y += Mathf.Sin(Time.time * bobSpeed) * bobAmount;
 
-        // ⭐ FIXED PerlinNoise Z-axis bug
-        float driftX = (Mathf.PerlinNoise(Time.time * driftSpeed + noiseOffsetX, 0f) - 0.5f) * driftAmount;
-        float driftZ = (Mathf.PerlinNoise(0f, Time.time * driftSpeed + noiseOffsetZ) - 0.5f) * driftAmount;
-
-        float microX = (Mathf.PerlinNoise(Time.time * microDriftSpeed + noiseOffsetX, 99f) - 0.5f) * microDriftAmount;
-        float microZ = (Mathf.PerlinNoise(99f, Time.time * microDriftSpeed + noiseOffsetZ) - 0.5f) * microDriftAmount;
-
-        Vector3 drift = new Vector3(driftX + microX, 0, driftZ + microZ);
-
-        float bob = Mathf.Sin(Time.time * bobSpeed) * bobAmount;
-
-        Vector3 targetPos = orbitPos + drift;
-        targetPos.y = patrolCenter.y + bob;
-
-        transform.position = Vector3.Lerp(transform.position, targetPos, Time.deltaTime * moveSpeed);
+        // Smooth movement
+        transform.position = Vector3.Lerp(transform.position, orbitPos, Time.deltaTime * moveSpeed);
     }
 }

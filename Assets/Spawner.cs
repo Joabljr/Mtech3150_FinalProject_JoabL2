@@ -5,21 +5,27 @@ public class Spawner : MonoBehaviour
     [Header("Spawn Points Parent")]
     public Transform spawnPointsParent;
 
-    [Header("Settings")]
+    [Header("Cube Prefabs")]
     public GameObject cubePrefab;        // normal cube (1 HP)
     public GameObject toughCubePrefab;   // tough cube (5 HP)
-    public float spawnInterval = 1f;
+    public GameObject superJumpCubePrefab;
 
+    [Header("Spawn Chances")]
     [Range(0f, 1f)]
-    public float toughCubeChance = 0.05f; // 5% tough cubes
+    public float toughCubeChance = 0.05f; // 5%
+    [Range(0f, 1f)]
+    public float superJumpCubeChance = 0.05f; // 5%
+
+    [Header("Spawn Speed (Ramping)")]
+    public float startSpawnInterval = 2f;     // slow at start
+    public float minSpawnInterval = 0.3f;     // fastest allowed
+    public float rampRate = 0.05f;            // how fast it speeds up
+
+    private float currentSpawnInterval;
+    private float spawnTimer = 0f;
 
     [HideInInspector]
     public Transform[] spawnPoints;
-
-    public GameObject superJumpCubePrefab;
-[Range(0f, 1f)]
-public float superJumpCubeChance = 0.05f; // 5% chance
-
 
     void OnValidate()
     {
@@ -40,23 +46,33 @@ public float superJumpCubeChance = 0.05f; // 5% chance
 
     void Start()
     {
-        StartCoroutine(SpawnLoop());
+        currentSpawnInterval = startSpawnInterval;
     }
 
-    System.Collections.IEnumerator SpawnLoop()
-{
-    while (true)
+    void Update()
     {
-        yield return new WaitForSeconds(spawnInterval);
+        spawnTimer += Time.deltaTime;
 
+        if (spawnTimer >= currentSpawnInterval)
+        {
+            spawnTimer = 0f;
+            SpawnCube();
+
+            // ⭐ RAMP UP SPAWN SPEED
+            currentSpawnInterval -= rampRate;
+            currentSpawnInterval = Mathf.Clamp(currentSpawnInterval, minSpawnInterval, startSpawnInterval);
+        }
+    }
+
+    void SpawnCube()
+    {
         if (spawnPoints == null || spawnPoints.Length == 0)
-            continue;
+            return;
 
         Transform point = spawnPoints[Random.Range(0, spawnPoints.Length)];
         Vector3 pos = point.position;
         pos.y -= 0.1f;
 
-        // Decide which cube to spawn
         GameObject prefabToSpawn;
 
         float roll = Random.value;
@@ -79,6 +95,4 @@ public float superJumpCubeChance = 0.05f; // 5% chance
 
         Instantiate(prefabToSpawn, pos, Quaternion.identity);
     }
-}
-
 }

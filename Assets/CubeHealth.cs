@@ -66,33 +66,25 @@ public class CubeHealth : MonoBehaviour
     {
         health -= damage;
 
-        // 🔊 Hit sound
         if (hitSound != null && audioSource != null)
             audioSource.PlayOneShot(hitSound);
 
-        // 🎨 Flash color
         if (!isFlashing)
             StartCoroutine(FlashColor());
 
-        // 💥 Scale punch
         if (useScalePunch)
             StartCoroutine(PunchScale());
 
-        // 🎨 Update health color
         UpdateHealthColor();
 
-        // ⭐ Only handle death here
         if (health <= 0)
         {
-            // 🔊 Break sound
             if (breakSound != null)
                 AudioSource.PlayClipAtPoint(breakSound, transform.position, 1f);
 
-            // ⭐ Voice line ONLY when cube actually breaks
             if (playerController != null)
                 playerController.PlayVoice(playerController.vl_cubeDestroyed, playerController.freq_cubeDestroyed);
 
-            // ⭐ Rewards (only if NOT enemy laser)
             if (!fromEnemyLaser && !rewardGiven)
             {
                 rewardGiven = true;
@@ -111,7 +103,6 @@ public class CubeHealth : MonoBehaviour
         }
     }
 
-    // --- COLOR FLASH ---
     private System.Collections.IEnumerator FlashColor()
     {
         isFlashing = true;
@@ -132,7 +123,6 @@ public class CubeHealth : MonoBehaviour
         isFlashing = false;
     }
 
-    // --- HEALTH COLOR ---
     private void UpdateHealthColor()
     {
         if (!useHealthColors || rend == null)
@@ -153,13 +143,11 @@ public class CubeHealth : MonoBehaviour
         rend.material.SetColor("_Color", target);
     }
 
-    // --- SCALE PUNCH ---
     private System.Collections.IEnumerator PunchScale()
     {
         Vector3 targetScale = originalScale * (1f + punchAmount);
         float t = 0f;
 
-        // Scale up
         while (t < 1f)
         {
             t += Time.deltaTime * punchSpeed;
@@ -169,7 +157,6 @@ public class CubeHealth : MonoBehaviour
 
         t = 0f;
 
-        // Scale back
         while (t < 1f)
         {
             t += Time.deltaTime * punchSpeed;
