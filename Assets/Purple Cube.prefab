@@ -154,7 +154,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 106f94d4d826e4b67991db3a16096d12, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::CubeHealth
-  health: 15
+  health: 6
   givesSpecialAttack: 1
   givesExtraJump: 0
   hitSound: {fileID: 8300000, guid: 47ddcc489096749bbb30b837e5428b7f, type: 3}

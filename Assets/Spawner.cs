@@ -6,20 +6,24 @@ public class Spawner : MonoBehaviour
     public Transform spawnPointsParent;
 
     [Header("Cube Prefabs")]
-    public GameObject cubePrefab;        // normal cube (1 HP)
-    public GameObject toughCubePrefab;   // tough cube (5 HP)
+    public GameObject cubePrefab;
+    public GameObject toughCubePrefab;
     public GameObject superJumpCubePrefab;
 
     [Header("Spawn Chances")]
     [Range(0f, 1f)]
-    public float toughCubeChance = 0.05f; // 5%
+    public float toughCubeChance = 0.05f;
     [Range(0f, 1f)]
-    public float superJumpCubeChance = 0.05f; // 5%
+    public float superJumpCubeChance = 0.05f;
 
-    [Header("Spawn Speed (Ramping)")]
-    public float startSpawnInterval = 2f;     // slow at start
-    public float minSpawnInterval = 0.3f;     // fastest allowed
-    public float rampRate = 0.05f;            // how fast it speeds up
+    [Header("Spawn Speed (Smooth Ramping)")]
+    public float startSpawnInterval = 2f;
+    public float minSpawnInterval = 0.3f;       // this will shrink over time
+    public float rampRate = 1.5f;               // how fast interval lerps toward min
+
+    [Header("Minimum Interval Shrink (Infinite Difficulty)")]
+    public float minSpawnDecreaseRate = 0.01f;  // how fast minSpawnInterval shrinks
+    public float absoluteMinLimit = 0.02f;      // never go below this
 
     private float currentSpawnInterval;
     private float spawnTimer = 0f;
@@ -51,16 +55,23 @@ public class Spawner : MonoBehaviour
 
     void Update()
     {
+        // ⭐ Shrink the minimum interval over time (infinite difficulty)
+        minSpawnInterval -= minSpawnDecreaseRate * Time.deltaTime;
+        minSpawnInterval = Mathf.Max(minSpawnInterval, absoluteMinLimit);
+
+        // ⭐ Smooth exponential ramping toward the *new* minimum
+        currentSpawnInterval = Mathf.Lerp(
+            currentSpawnInterval,
+            minSpawnInterval,
+            rampRate * Time.deltaTime
+        );
+
         spawnTimer += Time.deltaTime;
 
         if (spawnTimer >= currentSpawnInterval)
         {
             spawnTimer = 0f;
             SpawnCube();
-
-            // ⭐ RAMP UP SPAWN SPEED
-            currentSpawnInterval -= rampRate;
-            currentSpawnInterval = Mathf.Clamp(currentSpawnInterval, minSpawnInterval, startSpawnInterval);
         }
     }
 
@@ -77,17 +88,14 @@ public class Spawner : MonoBehaviour
 
         float roll = Random.value;
 
-        // Super jump cube first
         if (superJumpCubePrefab != null && roll < superJumpCubeChance)
         {
             prefabToSpawn = superJumpCubePrefab;
         }
-        // Tough cube second
         else if (toughCubePrefab != null && roll < superJumpCubeChance + toughCubeChance)
         {
             prefabToSpawn = toughCubePrefab;
         }
-        // Normal cube fallback
         else
         {
             prefabToSpawn = cubePrefab;
