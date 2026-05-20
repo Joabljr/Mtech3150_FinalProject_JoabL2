@@ -1,5 +1,6 @@
 using UnityEngine;
 using System.Collections;
+using UnityEngine.SceneManagement;
 
 public class FirstPersonController : MonoBehaviour
 {
@@ -17,17 +18,16 @@ public class FirstPersonController : MonoBehaviour
     float verticalRotation = 0f;
     Vector3 movement;
     float currentSpeed;
-
     bool wasGrounded = false;
-public int extraJumps = 0;
+    public int extraJumps = 0;
 
     [Header("Special Attack")]
     public bool hasSpecialAttack = false;
 
     [Header("Projectile Special Attack")]
-    public GameObject projectilePrefab;          // sphere projectile
-    public Transform projectileSpawnPoint;       // empty object in front of camera
-    public float projectileSpeed = 40f;          // adjustable speed
+    public GameObject projectilePrefab;
+    public Transform projectileSpawnPoint;
+    public float projectileSpeed = 40f;
 
     [Header("Laser (unused now)")]
     public LineRenderer playerLaser;
@@ -52,7 +52,10 @@ public int extraJumps = 0;
     public AudioClip vl_laserMissed;
     public AudioClip vl_enemyCharging;
     public AudioClip vl_enemyKilled;
+    public AudioClip introLine;
+    public AudioClip deathLine;
 
+    public float freq_deathLine = 1f;
     public float freq_specialCubeDestroyed = 1f;
     public float freq_specialAttackUsed = 1f;
     public float freq_laserMissed = 1f;
@@ -60,8 +63,7 @@ public int extraJumps = 0;
     public float freq_enemyKilled = 1f;
 
     public AudioClip vl_cubeDestroyed;
-public float freq_cubeDestroyed = 1f;
-
+    public float freq_cubeDestroyed = 1f;
 
     [Header("Raycast")]
     public float interactDistance = 5f;
@@ -71,19 +73,11 @@ public float freq_cubeDestroyed = 1f;
     public ParticleSystem impactPS;
     public int particleCount = 10;
 
-    
+    bool isDead = false;
 
-    public void PlayerDie()
-{
-    // Optional: play a death sound
-    PlayVoice(vl_enemyKilled, 1f);
-
-    // Restart the scene
-    UnityEngine.SceneManagement.SceneManager.LoadScene(
-        UnityEngine.SceneManagement.SceneManager.GetActiveScene().name
-    );
-}
-
+    // ---------------------------------------------------------
+    // LIFECYCLE
+    // ---------------------------------------------------------
 
     void Start()
     {
@@ -93,6 +87,8 @@ public float freq_cubeDestroyed = 1f;
         Cursor.visible = false;
         Cursor.lockState = CursorLockMode.Locked;
 
+        PlayVoice(introLine, 1f);
+
         if (playerLaser != null)
             playerLaser.enabled = false;
 
@@ -101,61 +97,71 @@ public float freq_cubeDestroyed = 1f;
 
         if (chargeWarningUI != null)
             chargeWarningUI.alpha = 0;
-
-                Debug.Log("Player spawned at: " + transform.position);
-
-    }
-
-    // ⭐ Player receives special attack from purple cubes
-    public void GainSpecialAttack()
-    {
-        if (hasSpecialAttack)
-            return;
-
-        hasSpecialAttack = true;
-
-        PlayVoice(vl_specialCubeDestroyed, freq_specialCubeDestroyed);
-        PlayVoice(specialReadyLine, 1f);
-    }
-
-    // ⭐ Player receives extra jump from special cubes
-    public void GainExtraJump()
-    {
-        extraJumps += 1;
-        PlayVoice(pickupLine, 1f);
     }
 
     void Update()
-{
-    MouseLook();
-    Movement();
-    Jumping();
-    Sprinting();
+    {
+        if (isDead) return;
 
-    HandleDestroy();
-    HandleLandingImpact();
-    HandleFootsteps();
-    HandleChargeWarningUI();
+        MouseLook();
+        Movement();
+        Jumping();
+        Sprinting();
 
-    // ⭐ ONLY THIS — ONE FIRING BLOCK
-    if (Input.GetKeyDown(KeyCode.F) && hasSpecialAttack)
-{
-    GameObject proj = Instantiate(
-        projectilePrefab,
-        projectileSpawnPoint.position,
-        projectileSpawnPoint.rotation
-    );
+        HandleDestroy();
+        HandleLandingImpact();
+        HandleFootsteps();
+        HandleChargeWarningUI();
 
-    PlayerProjectile p = proj.GetComponent<PlayerProjectile>();
-    if (p != null)
-        p.shootDirection = cam.transform.forward;
+        // Kill player if they fall off the map
+        if (transform.position.y < -50f)
+        {
+            PlayerDie();
+        }
 
-    hasSpecialAttack = false;   // ⭐ consume the special attack
-    PlayVoice(vl_specialAttackUsed, freq_specialAttackUsed);
-}
+        // Special attack (projectile) on F
+        if (Input.GetKeyDown(KeyCode.F) && hasSpecialAttack)
+        {
+            if (projectilePrefab != null && projectileSpawnPoint != null)
+            {
+                GameObject proj = Instantiate(
+                    projectilePrefab,
+                    projectileSpawnPoint.position,
+                    projectileSpawnPoint.rotation
+                );
 
-}
+                PlayerProjectile p = proj.GetComponent<PlayerProjectile>();
+                if (p != null)
+                    p.shootDirection = cam.transform.forward;
+            }
 
+            hasSpecialAttack = false;
+            PlayVoice(vl_specialAttackUsed, freq_specialAttackUsed);
+        }
+    }
+
+    // ---------------------------------------------------------
+    // DEATH
+    // ---------------------------------------------------------
+
+    public void PlayerDie()
+    {
+        if (isDead) return;
+        isDead = true;
+
+        PlayVoice(deathLine, freq_deathLine);
+
+        if (characterController != null)
+            characterController.enabled = false;
+
+        StartCoroutine(RestartAfterDelay(1.2f));
+    }
+
+    IEnumerator RestartAfterDelay(float delay)
+    {
+        yield return new WaitForSeconds(delay);
+        SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
+    }
 
     // ---------------------------------------------------------
     // MOVEMENT
@@ -190,7 +196,7 @@ public float freq_cubeDestroyed = 1f;
     }
 
     // ---------------------------------------------------------
-    // ⭐ SIMPLE JUMP
+    // JUMPING
     // ---------------------------------------------------------
 
     void Jumping()
@@ -275,7 +281,6 @@ public float freq_cubeDestroyed = 1f;
         if (!useChargeWarning || chargeWarningUI == null) return;
 
         chargeWarningUI.alpha = 1;
-
         PlayVoice(vl_enemyCharging, freq_enemyCharging);
     }
 
@@ -287,7 +292,7 @@ public float freq_cubeDestroyed = 1f;
     }
 
     // ---------------------------------------------------------
-    // SPECIAL ATTACK FLASH
+    // SPECIAL FLASH
     // ---------------------------------------------------------
 
     public bool useSpecialFlash = true;
@@ -309,36 +314,24 @@ public float freq_cubeDestroyed = 1f;
     }
 
     // ---------------------------------------------------------
-    // ⭐ SPECIAL ATTACK — PROJECTILE VERSION
+    // POWERUPS
     // ---------------------------------------------------------
 
-    void HandleSpecialAttack()
+    public void GainSpecialAttack()
     {
-        if (!Input.GetMouseButtonDown(1) && !Input.GetKeyDown(KeyCode.F))
+        if (hasSpecialAttack)
             return;
 
-        if (!hasSpecialAttack)
-            return;
+        hasSpecialAttack = true;
 
-        TriggerSpecialFlash();
+        PlayVoice(vl_specialCubeDestroyed, freq_specialCubeDestroyed);
+        PlayVoice(specialReadyLine, 1f);
+    }
 
-        // ⭐ Spawn projectile
-        if (projectilePrefab != null && projectileSpawnPoint != null)
-        {
-            GameObject proj = Instantiate(
-                projectilePrefab,
-                projectileSpawnPoint.position,
-                projectileSpawnPoint.rotation
-            );
-
-            PlayerProjectile p = proj.GetComponent<PlayerProjectile>();
-            if (p != null)
-                p.speed = projectileSpeed;
-        }
-
-        hasSpecialAttack = false;
-
-        PlayVoice(vl_specialAttackUsed, freq_specialAttackUsed);
+    public void GainExtraJump()
+    {
+        extraJumps += 1;
+        PlayVoice(pickupLine, 1f);
     }
 
     // ---------------------------------------------------------
@@ -346,19 +339,21 @@ public float freq_cubeDestroyed = 1f;
     // ---------------------------------------------------------
 
     void HandleDestroy()
-{
-    GameObject obj = ObjectInFocus();
-    if (obj == null) return;
-
-    //Debug.Log("Hit: " + obj.name + " | Tag: " + obj.tag);//
-
-
-    // ⭐ Make platform indestructible
-    if (obj.CompareTag("Platform"))
-        return;
-
-    if (Input.GetMouseButtonDown(0))
     {
+        if (!Input.GetMouseButtonDown(0))
+            return;
+
+        GameObject obj = ObjectInFocus();
+        if (obj == null)
+        {
+            PlayVoice(vl_laserMissed, freq_laserMissed);
+            return;
+        }
+
+        // Make platform indestructible
+        if (obj.CompareTag("Platform"))
+            return;
+
         if (impactPS != null)
         {
             impactPS.transform.position = hitPoint;
@@ -369,20 +364,20 @@ public float freq_cubeDestroyed = 1f;
         if (hp != null)
         {
             hp.TakeHit(1);
+            PlayVoice(vl_cubeDestroyed, freq_cubeDestroyed);
             return;
         }
 
-        EnemyHealth enemy = obj.GetComponent<EnemyHealth>();
-        if (enemy != null)
-        {
-            PlayVoice(vl_enemyKilled, freq_enemyKilled);
-            return;
-        }
+        FloatingEyeEnemy enemy = obj.GetComponent<FloatingEyeEnemy>();
+if (enemy != null)
+{
+    enemy.TakeDamage(1);
+    return; // enemy script already plays the voice line
+}
+
 
         Destroy(obj);
     }
-}
-
 
     // ---------------------------------------------------------
     // RAYCAST
@@ -405,9 +400,13 @@ public float freq_cubeDestroyed = 1f;
     // AUDIO HELPER
     // ---------------------------------------------------------
 
-public void PlayVoice(AudioClip clip, float volume)
+    public void PlayVoice(AudioClip clip, float probability)
     {
-        if (clip != null)
-            AudioSource.PlayClipAtPoint(clip, transform.position, volume);
+        if (clip == null) return;
+        if (Random.value > probability) return;
+
+        AudioSource src = GetComponent<AudioSource>();
+        if (src != null)
+            src.PlayOneShot(clip);
     }
 }

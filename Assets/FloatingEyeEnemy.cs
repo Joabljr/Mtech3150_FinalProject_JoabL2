@@ -247,15 +247,20 @@ public class FloatingEyeEnemy : MonoBehaviour
 
     // ---------------- HEALTH ----------------
     public void TakeDamage(int amount)
-    {
-        currentHealth -= amount;
-        if (healthBar != null) healthBar.SetValue(currentHealth);
+{
+    currentHealth -= amount;
+    if (healthBar != null) healthBar.SetValue(currentHealth);
 
-        if (currentHealth <= 0)
-        {
-            Destroy(gameObject);
-        }
+    if (currentHealth <= 0)
+    {
+        FirstPersonController player = FindObjectOfType<FirstPersonController>();
+        if (player != null)
+            player.PlayVoice(player.vl_enemyKilled, player.freq_enemyKilled);
+
+        Destroy(gameObject);
     }
+}
+
 
     // ---------------- MOVEMENT ----------------
     private void Update()
