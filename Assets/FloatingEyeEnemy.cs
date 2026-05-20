@@ -129,6 +129,10 @@ public class FloatingEyeEnemy : MonoBehaviour
         if (chargeParticles != null) chargeParticles.Play();
         if (chargeSound != null) chargeSound.Play();
 
+        FirstPersonController p = FindObjectOfType<FirstPersonController>();
+if (p != null)
+    p.PlayVoice(p.vl_enemyCharging, p.freq_enemyCharging);
+
         RaycastHit hit;
         if (Physics.Raycast(player.position + Vector3.up, Vector3.down, out hit, 10f))
             frozenTargetPoint = hit.point;
