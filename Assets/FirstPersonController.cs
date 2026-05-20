@@ -3,152 +3,87 @@ using System.Collections;
 
 public class FirstPersonController : MonoBehaviour
 {
-    private CharacterController characterController;
-    public Camera cam;
-
-    private bool hasSpecialAttack = false;
+    CharacterController characterController;
+    Camera cam;
 
     [Header("Movement")]
-    public float walkSpeed = 5f;
+    public float walkSpeed = 6f;
     public float sprintSpeed = 10f;
-    public float jumpForce = 5f;
-    public float gravity = 9.81f;
-
-    public int extraJumps = 0;
-
-    private float currentSpeed;
-    private Vector3 movement;
-    private float verticalRotation;
+    public float jumpForce = 8f;
+    public float gravity = 20f;
     public float mouseSensitivity = 2f;
-    public float UpDownRange = 60f;
+    public float UpDownRange = 80f;
 
-    [Header("Raycast / Interaction")]
-    private Vector3 hitPoint;
-    public float interactDistance = 5f;
+    float verticalRotation = 0f;
+    Vector3 movement;
+    float currentSpeed;
 
-    [Header("Particles")]
-    public ParticleSystem impactPS;
-    public int particleCount = 20;
+    bool wasGrounded = false;
+public int extraJumps = 0;
 
-    [Header("Special Attack Laser")]
+    [Header("Special Attack")]
+    public bool hasSpecialAttack = false;
+
+    [Header("Projectile Special Attack")]
+    public GameObject projectilePrefab;          // sphere projectile
+    public Transform projectileSpawnPoint;       // empty object in front of camera
+    public float projectileSpeed = 40f;          // adjustable speed
+
+    [Header("Laser (unused now)")]
     public LineRenderer playerLaser;
-    public float laserDuration = 0.15f;
-    public float laserMaxDistance = 50f;
+    public float laserDuration = 0.1f;
+    public float laserMaxDistance = 100f;
 
-    // ---------------------------------------------------------
-    // ⭐ FUN FEATURES YOU KEPT
-    // ---------------------------------------------------------
+    [Header("UI + Effects")]
+    public CanvasGroup specialFlash;
+    public CanvasGroup chargeWarningUI;
+    public float flashFadeSpeed = 4f;
+    public float chargeWarningFadeSpeed = 2f;
 
-    [Header("Landing Impact")]
-    public bool useLandingImpact = true;
-    public float landingKick = 4f;
-    private bool wasGrounded;
-
-    [Header("Footstep Sounds")]
-    public bool useFootsteps = true;
+    [Header("Audio")]
     public AudioSource footstepSource;
     public AudioClip walkStep;
     public AudioClip sprintStep;
-    public float stepInterval = 0.45f;
-    private float stepTimer;
-
-    [Header("Special Attack Flash")]
-    public bool useSpecialFlash = true;
-    public CanvasGroup specialFlash;
-    public float flashFadeSpeed = 6f;
-
-    [Header("Enemy Charging Warning")]
-    public bool useChargeWarning = true;
-    public CanvasGroup chargeWarningUI;
-    public float chargeWarningFadeSpeed = 3f;
-
-    // ---------------------------------------------------------
-    // ⭐ PLAYER VOICE LINES (existing)
-    // ---------------------------------------------------------
-
-    [Header("Player Voice Lines")]
-    public bool useVoice = true;
-    public AudioSource voiceSource;
-    public AudioClip pickupLine;
-    public AudioClip specialReadyLine;
     public AudioClip jumpLine;
-
-    // ---------------------------------------------------------
-    // ⭐ NEW — GENERIC VOICE LINES YOU CAN USE NOW
-    // ---------------------------------------------------------
-
-    [Header("Generic Voice Lines — NOW")]
-    public AudioClip vl_specialAttackUsed;
-    public AudioClip vl_enemyCharging;
-    public AudioClip vl_enemyFiring;
-    public AudioClip vl_cubeDestroyed;
+    public AudioClip pickupLine;
     public AudioClip vl_specialCubeDestroyed;
-    public AudioClip vl_lowHealth;
+    public AudioClip specialReadyLine;
+    public AudioClip vl_specialAttackUsed;
     public AudioClip vl_laserMissed;
-
-    // ---------------------------------------------------------
-    // ⭐ NEW — GENERIC VOICE LINES YOU WILL USE LATER
-    // ---------------------------------------------------------
-
-    [Header("Generic Voice Lines — LATER")]
-    public AudioClip vl_playerDamaged;
-    public AudioClip vl_playerDeath;
-    public AudioClip vl_enemySpawned;
+    public AudioClip vl_enemyCharging;
     public AudioClip vl_enemyKilled;
-    public AudioClip vl_newArea;
-    public AudioClip vl_bossApproaching;
-    public AudioClip vl_tutorialHint;
 
-    // ---------------------------------------------------------
-    // ⭐ NEW — GENERIC VOICE LINES YOU SHOULD HAVE (FUTURE PROOF)
-    // ---------------------------------------------------------
+    public float freq_specialCubeDestroyed = 1f;
+    public float freq_specialAttackUsed = 1f;
+    public float freq_laserMissed = 1f;
+    public float freq_enemyCharging = 1f;
+    public float freq_enemyKilled = 1f;
 
-    [Header("Generic Voice Lines — SHOULD HAVE")]
-    public AudioClip vl_itemCollected;
-    public AudioClip vl_upgradeInstalled;
-    public AudioClip vl_worldEvent;
-    public AudioClip vl_secretFound;
-    public AudioClip vl_glitch01;
-    public AudioClip vl_glitch02;
-    public AudioClip vl_glitch03;
+    public AudioClip vl_cubeDestroyed;
+public float freq_cubeDestroyed = 1f;
 
-    // ---------------------------------------------------------
-    // ⭐ VOICE FREQUENCY CONTROLS
-    // ---------------------------------------------------------
 
-    [Header("Voice Line Frequency Controls")]
-    [Range(0f, 1f)] public float freq_enemyCharging = 1f;
-    [Range(0f, 1f)] public float freq_enemyFiring = 1f;
-    [Range(0f, 1f)] public float freq_cubeDestroyed = 1f;
-    [Range(0f, 1f)] public float freq_specialCubeDestroyed = 1f;
-    [Range(0f, 1f)] public float freq_specialAttackUsed = 1f;
-    [Range(0f, 1f)] public float freq_lowHealth = 1f;
-    [Range(0f, 1f)] public float freq_laserMissed = 1f;
-    [Range(0f, 1f)] public float freq_playerDamaged = 1f;
-    [Range(0f, 1f)] public float freq_playerDeath = 1f;
-    [Range(0f, 1f)] public float freq_enemySpawned = 1f;
-    [Range(0f, 1f)] public float freq_enemyKilled = 1f;
-    [Range(0f, 1f)] public float freq_newArea = 1f;
-    [Range(0f, 1f)] public float freq_bossApproaching = 1f;
-    [Range(0f, 1f)] public float freq_itemCollected = 1f;
-    [Range(0f, 1f)] public float freq_upgradeInstalled = 1f;
-    [Range(0f, 1f)] public float freq_worldEvent = 1f;
-    [Range(0f, 1f)] public float freq_secretFound = 1f;
+    [Header("Raycast")]
+    public float interactDistance = 5f;
+    Vector3 hitPoint;
 
-    // ---------------------------------------------------------
-    // ⭐ VOICE HELPER FUNCTION
-    // ---------------------------------------------------------
+    [Header("Particles")]
+    public ParticleSystem impactPS;
+    public int particleCount = 10;
 
-    public void PlayVoice(AudioClip clip, float frequency)
-    {
-        if (!useVoice || voiceSource == null || clip == null)
-            return;
+    
 
-        if (Random.value <= frequency)
-            voiceSource.PlayOneShot(clip);
-    }
+    public void PlayerDie()
+{
+    // Optional: play a death sound
+    PlayVoice(vl_enemyKilled, 1f);
 
-    // ---------------------------------------------------------
+    // Restart the scene
+    UnityEngine.SceneManagement.SceneManager.LoadScene(
+        UnityEngine.SceneManagement.SceneManager.GetActiveScene().name
+    );
+}
+
 
     void Start()
     {
@@ -166,6 +101,9 @@ public class FirstPersonController : MonoBehaviour
 
         if (chargeWarningUI != null)
             chargeWarningUI.alpha = 0;
+
+                Debug.Log("Player spawned at: " + transform.position);
+
     }
 
     // ⭐ Player receives special attack from purple cubes
@@ -188,22 +126,36 @@ public class FirstPersonController : MonoBehaviour
     }
 
     void Update()
-    {
-        MouseLook();
-        Movement();
-        Jumping();
-        Sprinting();
+{
+    MouseLook();
+    Movement();
+    Jumping();
+    Sprinting();
 
-        HandleDestroy();
-        HandleSpecialAttack();
+    HandleDestroy();
+    HandleLandingImpact();
+    HandleFootsteps();
+    HandleChargeWarningUI();
 
-        HandleLandingImpact();
-        HandleFootsteps();
-        HandleChargeWarningUI();
+    // ⭐ ONLY THIS — ONE FIRING BLOCK
+    if (Input.GetKeyDown(KeyCode.F) && hasSpecialAttack)
+{
+    GameObject proj = Instantiate(
+        projectilePrefab,
+        projectileSpawnPoint.position,
+        projectileSpawnPoint.rotation
+    );
 
-        if (Input.GetKeyDown(KeyCode.T))
-            PlayVoice(vl_enemyCharging, 1f);
-    }
+    PlayerProjectile p = proj.GetComponent<PlayerProjectile>();
+    if (p != null)
+        p.shootDirection = cam.transform.forward;
+
+    hasSpecialAttack = false;   // ⭐ consume the special attack
+    PlayVoice(vl_specialAttackUsed, freq_specialAttackUsed);
+}
+
+}
+
 
     // ---------------------------------------------------------
     // MOVEMENT
@@ -275,8 +227,6 @@ public class FirstPersonController : MonoBehaviour
 
     void HandleLandingImpact()
     {
-        if (!useLandingImpact) return;
-
         if (!wasGrounded && characterController.isGrounded)
         {
             cam.transform.localPosition = new Vector3(0, -0.1f, 0);
@@ -286,6 +236,10 @@ public class FirstPersonController : MonoBehaviour
     // ---------------------------------------------------------
     // FOOTSTEPS
     // ---------------------------------------------------------
+
+    float stepTimer = 0f;
+    public float stepInterval = 0.5f;
+    public bool useFootsteps = true;
 
     void HandleFootsteps()
     {
@@ -311,8 +265,10 @@ public class FirstPersonController : MonoBehaviour
     }
 
     // ---------------------------------------------------------
-    // CHARGE WARNING UI (enemy charging)
+    // CHARGE WARNING UI
     // ---------------------------------------------------------
+
+    public bool useChargeWarning = true;
 
     public void ShowChargeWarning()
     {
@@ -334,6 +290,8 @@ public class FirstPersonController : MonoBehaviour
     // SPECIAL ATTACK FLASH
     // ---------------------------------------------------------
 
+    public bool useSpecialFlash = true;
+
     void TriggerSpecialFlash()
     {
         if (!useSpecialFlash || specialFlash == null) return;
@@ -351,24 +309,8 @@ public class FirstPersonController : MonoBehaviour
     }
 
     // ---------------------------------------------------------
-    // SPECIAL ATTACK
+    // ⭐ SPECIAL ATTACK — PROJECTILE VERSION
     // ---------------------------------------------------------
-
-    IEnumerator FirePlayerLaser(Vector3 start, Vector3 end)
-    {
-        if (playerLaser == null)
-            yield break;
-
-        playerLaser.positionCount = 2;
-        playerLaser.SetPosition(0, start);
-        playerLaser.SetPosition(1, end);
-
-        playerLaser.widthMultiplier = 0.15f;
-
-        playerLaser.enabled = true;
-        yield return new WaitForSeconds(laserDuration);
-        playerLaser.enabled = false;
-    }
 
     void HandleSpecialAttack()
     {
@@ -376,40 +318,27 @@ public class FirstPersonController : MonoBehaviour
             return;
 
         if (!hasSpecialAttack)
-        {
-            // No special attack available — no voice line needed
             return;
-        }
 
         TriggerSpecialFlash();
 
-        RaycastHit hit;
-        Vector3 origin = cam.transform.position;
-        Vector3 direction = cam.transform.forward;
-        Vector3 laserEndPoint = origin + direction * laserMaxDistance;
-
-        bool hitSomething = false;
-
-        if (Physics.Raycast(origin, direction, out hit, laserMaxDistance))
+        // ⭐ Spawn projectile
+        if (projectilePrefab != null && projectileSpawnPoint != null)
         {
-            hitSomething = true;
-            laserEndPoint = hit.point;
+            GameObject proj = Instantiate(
+                projectilePrefab,
+                projectileSpawnPoint.position,
+                projectileSpawnPoint.rotation
+            );
 
-            EnemyHealth enemy = hit.collider.GetComponent<EnemyHealth>();
-            if (enemy != null)
-            {
-                enemy.TakeSpecialDamage(1);
-                hasSpecialAttack = false;
-            }
+            PlayerProjectile p = proj.GetComponent<PlayerProjectile>();
+            if (p != null)
+                p.speed = projectileSpeed;
         }
 
-        Vector3 start = cam.transform.position + cam.transform.forward * 1f;
-        StartCoroutine(FirePlayerLaser(start, laserEndPoint));
+        hasSpecialAttack = false;
 
         PlayVoice(vl_specialAttackUsed, freq_specialAttackUsed);
-
-        if (!hitSomething)
-            PlayVoice(vl_laserMissed, freq_laserMissed);
     }
 
     // ---------------------------------------------------------
@@ -417,35 +346,43 @@ public class FirstPersonController : MonoBehaviour
     // ---------------------------------------------------------
 
     void HandleDestroy()
+{
+    GameObject obj = ObjectInFocus();
+    if (obj == null) return;
+
+    //Debug.Log("Hit: " + obj.name + " | Tag: " + obj.tag);//
+
+
+    // ⭐ Make platform indestructible
+    if (obj.CompareTag("Platform"))
+        return;
+
+    if (Input.GetMouseButtonDown(0))
     {
-        GameObject obj = ObjectInFocus();
-        if (obj == null) return;
-
-        if (Input.GetMouseButtonDown(0))
+        if (impactPS != null)
         {
-            if (impactPS != null)
-            {
-                impactPS.transform.position = hitPoint;
-                impactPS.Emit(particleCount);
-            }
-
-            CubeHealth hp = obj.GetComponent<CubeHealth>();
-            if (hp != null)
-            {
-                hp.TakeHit(1);
-                return; // ⭐ cubeDestroyed voice removed (CubeHealth handles it)
-            }
-
-            EnemyHealth enemy = obj.GetComponent<EnemyHealth>();
-            if (enemy != null)
-            {
-                PlayVoice(vl_enemyKilled, freq_enemyKilled);
-                return;
-            }
-
-            Destroy(obj);
+            impactPS.transform.position = hitPoint;
+            impactPS.Emit(particleCount);
         }
+
+        CubeHealth hp = obj.GetComponent<CubeHealth>();
+        if (hp != null)
+        {
+            hp.TakeHit(1);
+            return;
+        }
+
+        EnemyHealth enemy = obj.GetComponent<EnemyHealth>();
+        if (enemy != null)
+        {
+            PlayVoice(vl_enemyKilled, freq_enemyKilled);
+            return;
+        }
+
+        Destroy(obj);
     }
+}
+
 
     // ---------------------------------------------------------
     // RAYCAST
@@ -462,5 +399,15 @@ public class FirstPersonController : MonoBehaviour
         }
 
         return null;
+    }
+
+    // ---------------------------------------------------------
+    // AUDIO HELPER
+    // ---------------------------------------------------------
+
+public void PlayVoice(AudioClip clip, float volume)
+    {
+        if (clip != null)
+            AudioSource.PlayClipAtPoint(clip, transform.position, volume);
     }
 }

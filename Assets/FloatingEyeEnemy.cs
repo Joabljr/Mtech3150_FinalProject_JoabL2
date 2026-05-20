@@ -75,7 +75,6 @@ public class FloatingEyeEnemy : MonoBehaviour
         StyleLaser(aimingLine, 0.08f, Color.yellow);
         StyleLaser(laserBeam, 0.35f, Color.red);
 
-        // Charge beam gets its own material so color lerp works every time
         chargeBeam.material = new Material(Shader.Find("Unlit/Color"));
         chargeBeam.material.color = Color.yellow;
 
@@ -130,14 +129,12 @@ public class FloatingEyeEnemy : MonoBehaviour
         if (chargeParticles != null) chargeParticles.Play();
         if (chargeSound != null) chargeSound.Play();
 
-        // Freeze exact ground point under player
         RaycastHit hit;
         if (Physics.Raycast(player.position + Vector3.up, Vector3.down, out hit, 10f))
             frozenTargetPoint = hit.point;
         else
             frozenTargetPoint = player.position;
 
-        // REAL SPEED SCALING
         float scaledLockOn = lockOnTime / chargeSpeedMultiplier;
 
         while (timer < scaledLockOn)
@@ -147,7 +144,6 @@ public class FloatingEyeEnemy : MonoBehaviour
             Vector3 origin = transform.position;
             Vector3 dir = (frozenTargetPoint - origin).normalized;
 
-            // LONG CHARGE BEAM
             chargeBeam.SetPosition(0, origin);
             chargeBeam.SetPosition(1, origin + dir * laserRange);
 
@@ -155,7 +151,6 @@ public class FloatingEyeEnemy : MonoBehaviour
             chargeBeam.startWidth = width;
             chargeBeam.endWidth = width;
 
-            // REAL COLOR TRANSITION
             Color c = Color.Lerp(Color.yellow, Color.red, t);
             chargeBeam.material.color = c;
             chargeBeam.startColor = c;
@@ -197,10 +192,14 @@ public class FloatingEyeEnemy : MonoBehaviour
 
             foreach (RaycastHit h in hits)
             {
+                // ⭐ Correct player kill logic
                 if (h.collider.CompareTag("Player"))
-                {
-                    SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
-                }
+{
+    FirstPersonController player = h.collider.GetComponentInParent<FirstPersonController>();
+    if (player != null)
+        player.PlayerDie();
+}
+
 
                 CubeHealth cube = h.collider.GetComponent<CubeHealth>();
                 if (cube != null)
